@@ -4,23 +4,22 @@ from faker import Faker
 from datetime import datetime, timedelta
 import random
 import json
-import itertools
-from tqdm import tqdm
 import os
-from dotenv import load_dotenv
+import itertools
+import uuid
+from tqdm import tqdm
 import sys
+import time
 import backoff
+from dotenv import load_dotenv
 
-
-
-
+# Initialize Faker
 load_dotenv()
-
-
 fake = Faker('en_IN')
 
+# Initialize Gemini API client
 try:
-    client = genai.Client(api_key = os.getenv("GOOGLE_API_KEY"))
+    client = genai.Client(api_key=os.getenv('GOOGLE_API_KEY'))
 except Exception as e:
     print(f"Failed to initialize Gemini API client: {e}")
     sys.exit(1)
@@ -47,7 +46,7 @@ scenarios = [
     {'name': 'RO_2018_09_Expired_OD_GT_90D_TP_90D', 'category': 'four_wheeler', 'journey_type': 'without_registration', 'tp_status': '>90D', 'od_status': '>90D', 'ownership': 'Individual', 'ownership_changed': 'No', 'claim_taken': 'No', 'policy_type': 'comprehensive', 'manufacturing_year': '>2018-09'},
 ]
 
-
+# Define carriers and vehicles
 carriers = [
     'Reliance Motor',
     'Future Generali India',
@@ -66,7 +65,7 @@ vehicles = [
     {'category': 'four_wheeler', 'make_model': 'HONDA CITY', 'variant': '1.5 V MT (CC - 1497 Seat Cap - 5 Fuel - Petrol)'}
 ]
 
-
+# Function to generate realistic data with Gemini API (with retries)
 @backoff.on_exception(
     backoff.expo,
     Exception,
@@ -106,28 +105,28 @@ def generate_customer_data():
         )
         response_text = response.text.strip()
 
-       
+        # Handle markdown or plain JSON
         if response_text.startswith('```json'):
             response_text = response_text[7:-3].strip()
         elif response_text.startswith('```'):
             response_text = response_text[3:-3].strip()
 
-     
+        # Parse JSON
         try:
             customer_data = json.loads(response_text)
         except json.JSONDecodeError:
             return fallback_data
 
-        
+        # Validate response
         if not isinstance(customer_data, dict):
             return fallback_data
 
-        
+        # Check required keys
         missing_keys = [key for key in required_keys if key not in customer_data]
         if missing_keys:
             return fallback_data
 
-       
+        # Check address
         if not isinstance(customer_data['address'], dict):
             customer_data['address'] = fallback_data['address']
         else:
@@ -135,7 +134,7 @@ def generate_customer_data():
             if missing_address_keys:
                 customer_data['address'] = fallback_data['address']
 
-      
+        # Validate data types and formats
         if not isinstance(customer_data['phone_number'], str) or not customer_data['phone_number'].isdigit() or len(customer_data['phone_number']) != 10:
             customer_data['phone_number'] = fallback_data['phone_number']
         if not isinstance(customer_data['registration_number'], str) or not len(customer_data['registration_number']) == 10:
@@ -147,13 +146,13 @@ def generate_customer_data():
     except Exception:
         return fallback_data
 
-
+# Function to generate a test case
 def generate_test_case(scenario, testcase_id):
     vehicle = random.choice([v for v in vehicles if v['category'] == scenario['category']])
     carrier = random.choice(carriers)
     manufacturing_year = random.randint(2010, 2023) if scenario.get('manufacturing_year', '') == '>2018-09' else random.randint(2010, 2018)
 
-    
+    # Apply business rules
     ncb = 0
     inspection_required = 'Yes'
     if scenario['claim_taken'] == 'Yes' or scenario['ownership_changed'] == 'Yes':
@@ -162,13 +161,13 @@ def generate_test_case(scenario, testcase_id):
         ncb = random.choice([0.2, 0.25, 0.35, 0.45, 0.5])
         inspection_required = 'No' if scenario['od_status'] == 'today' and scenario['tp_status'] == 'today' else 'Yes'
 
- 
+    # Vehicle age check
     current_year = 2025
     if manufacturing_year < 2010:
         print(f"Vehicle manufactured in {manufacturing_year} is >15 years old, not eligible for quotes")
         return None
 
-    
+    # Set expiry dates
     current_date = datetime(2025, 5, 22)
     previous_expiry_date = ''
     previous_tp_expiry_date = ''
@@ -190,14 +189,14 @@ def generate_test_case(scenario, testcase_id):
     elif scenario['tp_status'] == '60D-90D':
         previous_tp_expiry_date = (current_date - timedelta(days=random.randint(60, 89))).strftime('%d/%m/%Y')
 
-   
+    # Generate customer data
     try:
         customer_data = generate_customer_data()
     except Exception as e:
         print(f"Critical error in generate_customer_data: {e}. Stopping execution.")
         sys.exit(1)
 
-    
+    # Generate add-ons and discounts
     addons = []
     discounts = []
     if scenario['policy_type'] == 'comprehensive':
@@ -251,7 +250,7 @@ def generate_test_case(scenario, testcase_id):
         'carrier_name': carrier
     }
 
-
+# Function to expand scenarios with additional combinations
 def expand_scenarios():
     categories = ['two_wheeler', 'four_wheeler']
     journey_types = ['new_journey', 'without_registration']
@@ -278,7 +277,7 @@ def expand_scenarios():
         })
     return additional_scenarios
 
-
+# Generate test cases with progress bar
 test_cases = []
 all_scenarios = scenarios + expand_scenarios()[:50]
 total_scenarios = len(all_scenarios)
@@ -302,7 +301,7 @@ except KeyboardInterrupt:
 except Exception as e:
     print(f"Unexpected error: {e}. Saving progress...")
 
-
+# Save to Excel
 try:
     df = pd.DataFrame(test_cases)
     df.to_excel('automation_data_table_generated.xlsx', index=False)

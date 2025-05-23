@@ -9,20 +9,42 @@ from tqdm import tqdm
 import sys
 from multiprocessing import Pool
 from functools import partial
-from data.test_case_data import scenarios, carriers, vehicles
+from data.test_case_data import scenarios, carriers, vehicles, city_state_mapping, base_idv_ranges
 
 # Initialize Faker
 fake = Faker('en_IN')
 
+def calculate_depreciation(vehicle_age):
+    """Calculate depreciation percentage based on vehicle age."""
+    if vehicle_age <= 1:
+        return 0.05  # 5% for 0–1 year
+    elif vehicle_age <= 2:
+        return 0.15  # 15% for 1–2 years
+    elif vehicle_age <= 3:
+        return 0.25  # 25% for 2–3 years
+    elif vehicle_age <= 4:
+        return 0.35  # 35% for 3–4 years
+    elif vehicle_age <= 5:
+        return 0.45  # 45% for 4–5 years
+    elif vehicle_age <= 10:
+        return 0.50  # 50% for 5–10 years
+    else:
+        return 0.60  # 60% for >10 years
+
 # Pre-generate a pool of customer data
-def pre_generate_customer_data_pool(size=10000):  # Reduced size for efficiency
+def pre_generate_customer_data_pool(size=10000):
     pool = []
     for _ in tqdm(range(size), desc="Pre-generating customer data"):
         name = fake.name()
         phone_number = ''.join(filter(str.isdigit, fake.phone_number()))[:10]
-        registration_number = fake.bothify(text='??##??####')
-        if not re.match(r'^[A-Z]{2}\d{2}[A-Z]{2}\d{4}$', registration_number):
-            registration_number = random.choice(['KA01AB1234', 'MH05CD5678', 'DL03EF9012'])
+        # Ensure valid registration number format (e.g., KA01AB1234)
+        registration_number = fake.bothify(text='??##??####').upper()
+        while not re.match(r'^[A-Z]{2}\d{2}[A-Z]{2}\d{4}$', registration_number):
+            registration_number = fake.bothify(text='??##??####').upper()
+        
+        # Ensure city-state consistency
+        city = random.choice(list(city_state_mapping.keys()))
+        state = city_state_mapping[city]
         
         pool.append({
             'name': name,
@@ -32,8 +54,8 @@ def pre_generate_customer_data_pool(size=10000):  # Reduced size for efficiency
             'address': {
                 'address_line_1': fake.street_address(),
                 'pincode': fake.postcode(),
-                'city': fake.city(),
-                'state': fake.state()
+                'city': city,
+                'state': state
             }
         })
     return pool
@@ -41,47 +63,102 @@ def pre_generate_customer_data_pool(size=10000):  # Reduced size for efficiency
 customer_data_pool = pre_generate_customer_data_pool(10000)
 
 def generate_customer_data():
+    """Select a random customer profile from the pre-generated pool."""
     return random.choice(customer_data_pool)
 
 def generate_test_case(scenario, testcase_id):
     try:
+        # Validate required scenario fields
+        required_fields = ['name', 'category', 'journey_type', 'policy_type', 'ownership', 
+                         'ownership_changed', 'claim_taken', 'tp_status', 'od_status']
+        for field in required_fields:
+            if field not in scenario:
+                return None
+
         vehicle = random.choice([v for v in vehicles if v['category'] == scenario['category']])
         carrier = random.choice(carriers)
         current_date = datetime.now()
         
-        # Manufacturing year logic
+        # Manufacturing year logic with precise handling
         current_year = current_date.year
-        manufacturing_year = random.randint(2000, 2018) if scenario.get('manufacturing_year', '') == '<2018-09' else \
-                           random.randint(2000, 2009) if scenario.get('manufacturing_year', '') == '<2010' else \
-                           random.randint(current_year - 1, current_year)  # Same or previous year
+        if scenario.get('manufacturing_year', '') == '<2018-09':
+            manufacturing_year = random.randint(2000, 2018)
+            manufacturing_date = datetime(manufacturing_year, random.randint(1, 8), 1)
+        elif scenario.get('manufacturing_year', '') == '<2010':
+            manufacturing_year = random.randint(2000, 2009)
+            manufacturing_date = datetime(manufacturing_year, random.randint(1, 12), 1)
+        else:
+            manufacturing_year = random.randint(current_year - 1, current_year)
+            manufacturing_date = datetime(manufacturing_year, random.randint(1, 12), 1)
 
         # Vehicle age check
-        if current_year - manufacturing_year > 15 and scenario['name'] != 'VEHICLE_AGE_GT_15Y':
+        vehicle_age = current_year - manufacturing_year
+        if vehicle_age > 15 and scenario['name'] != 'VEHICLE_AGE_GT_15Y':
             return None
 
-        # Apply business rules
+        # Calculate IDV based on vehicle details
+        base_idv_min, base_idv_max = base_idv_ranges.get(vehicle['make_model'], (50000, 1500000))
+        depreciation = calculate_depreciation(vehicle_age)
+        
+        # Extract engine capacity and fuel type from variant
+        variant = vehicle['variant']
+        engine_cc = int(re.search(r'CC - (\d+)', variant).group(1)) if re.search(r'CC - (\d+)', variant) else 1000
+        fuel_type = re.search(r'Fuel - (\w+)', variant).group(1) if re.search(r'Fuel - (\w+)', variant) else 'Petrol'
+
+        # Adjust base IDV for fuel type and engine capacity
+        idv_adjustment = 1.0
+        if fuel_type == 'Diesel':
+            idv_adjustment *= 1.1  # +10% for diesel
+        if scenario['category'] == 'four_wheeler' and engine_cc > 1500:
+            idv_adjustment *= 1.2  # +20% for high CC four-wheelers
+        elif scenario['category'] == 'two_wheeler' and engine_cc > 250:
+            idv_adjustment *= 1.15  # +15% for high CC two-wheelers
+
+        # Apply claim adjustment
+        if scenario['claim_taken'] == 'Yes':
+            idv_adjustment *= 0.95  # -5% if claims made
+
+        # Calculate final IDV range
+        idv_min = int(base_idv_min * (1 - depreciation) * idv_adjustment * 0.8)  # 80% of base
+        idv_max = int(base_idv_max * (1 - depreciation) * idv_adjustment * 1.2)  # 120% of base
+        idv = random.randint(idv_min, idv_max) if scenario['journey_type'] == 'without_registration' else 0
+
+        # Inspection logic based on provided factors
+        inspection_required = 'No'
+        if scenario['journey_type'] == 'new_journey':
+            inspection_required = 'No'  # Rule 1: No inspection for new business
+        elif scenario['ownership_changed'] == 'Yes':
+            inspection_required = 'Yes'  # Rule 2: Inspection required for ownership transfer
+        elif scenario['journey_type'] == 'rollover':
+            # Rule 3: Inspection required for expired policies
+            expired_statuses = ['>90D', '<90D', '<60D', '<3D', '60D-90D']
+            if scenario['od_status'] in expired_statuses or scenario['tp_status'] in expired_statuses:
+                inspection_required = 'Yes'
+            elif scenario['od_status'] == 'today' and scenario['tp_status'] == 'today':
+                inspection_required = 'No'
+
+        # NCB logic aligned with inspection
         ncb = '0%'
-        inspection_required = 'Yes'
-        if scenario['journey_type'] == 'rollover' and scenario['claim_taken'] == 'Yes' or scenario['ownership_changed'] == 'Yes':
-            ncb = '0%'
-        elif scenario['journey_type'] == 'rollover' and scenario['od_status'] in ['today', '<90D'] and scenario['tp_status'] in ['today', '<3D', '<60D', '60D-90D']:
-            ncb = random.choice(['0%', '20%', '25%', '35%', '45%', '50%'])
-            inspection_required = 'No' if scenario['od_status'] == 'today' and scenario['tp_status'] == 'today' else 'Yes'
+        if scenario['journey_type'] == 'rollover':
+            if scenario['claim_taken'] == 'Yes' or scenario['ownership_changed'] == 'Yes':
+                ncb = '0%'  # Reset NCB for claims or ownership change
+            elif inspection_required == 'No':
+                ncb = random.choice(['0%', '20%', '25%', '35%', '45%', '50%'])  # Apply NCB for active policies
 
         # Set expiry dates
         previous_expiry_date = ''
         previous_tp_expiry_date = ''
+        registration_date_obj = fake.date_between(start_date=date(manufacturing_year, 1, 1), end_date='today')
+        registration_date = registration_date_obj.strftime('%d/%m/%Y')
         if scenario['journey_type'] == 'rollover':
             if scenario['od_status'] == '>90D':
                 previous_expiry_date = (current_date - timedelta(days=random.choice([120, 123, 365]))).strftime('%d/%m/%Y')
             elif scenario['od_status'] == '<90D':
-                previous_expiry_date = (current_date - timedelta(days=random.choice([15, 45, 89]))).strftime('%d/%m/%Y')
+                previous_expiry_date = (current_date - timedelta(days=random.randint(15, 89))).strftime('%d/%m/%Y')
             elif scenario['od_status'] == 'today':
                 previous_expiry_date = current_date.strftime('%d/%m/%Y')
 
             # Third-party tenure calculation
-            registration_date_obj = fake.date_between(start_date=date(manufacturing_year, 1, 1), end_date='today')
-            registration_date = registration_date_obj.strftime('%d/%m/%Y')
             tp_tenure = random.choice([1, 3]) if scenario['category'] == 'four_wheeler' else random.choice([1, 5])
             if scenario['tp_status'] == '>90D':
                 previous_tp_expiry_date = (current_date - timedelta(days=random.choice([120, 365]))).strftime('%d/%m/%Y')
@@ -98,6 +175,11 @@ def generate_test_case(scenario, testcase_id):
 
         # Generate customer data
         customer_data = generate_customer_data()
+
+        # Ensure registration number for rollover and without_registration journeys
+        registration_number = customer_data['registration_number'] if scenario['journey_type'] in ['without_registration', 'rollover'] else ''
+        if not registration_number and scenario['journey_type'] == 'rollover':
+            return None
 
         # Add-ons and discounts
         available_addons = ['ZERO_DEPRECIATION_COVER', 'ROAD_SIDE_ASSISTANCE', 'PERSONAL_ACCIDENT', 'NCB_PROTECTION', 'INCONVENIENCE_ALLOWANCE']
@@ -122,14 +204,21 @@ def generate_test_case(scenario, testcase_id):
         kyc_details = []
         proposer_pan = ''
         proposer_aadhaar = ''
-        if kyc_type == 'PAN':
-            proposer_pan = fake.bothify(text='?????####?')
-            kyc_details = [{'PAN': {'pan': proposer_pan, 'dob': fake.date_of_birth(minimum_age=18, maximum_age=70).strftime('%d/%m/%Y')}}]
-        elif kyc_type == 'AADHAR':
-            proposer_aadhaar = fake.bothify(text='#### #### ####')
-            kyc_details = [{'AADHAR': {'number': proposer_aadhaar, 'dob': fake.date_of_birth(minimum_age=18, maximum_age=70).strftime('%d/%m/%Y')}}]
+        if kyc_verification == 'Yes':
+            if kyc_type == 'PAN':
+                proposer_pan = fake.bothify(text='?????####?').upper()
+                while not re.match(r'^[A-Z]{5}\d{4}[A-Z]$', proposer_pan):
+                    proposer_pan = fake.bothify(text='?????####?').upper()
+                kyc_details = [{'PAN': {'pan': proposer_pan, 'dob': fake.date_of_birth(minimum_age=18, maximum_age=70).strftime('%d/%m/%Y')}}]
+            elif kyc_type == 'AADHAR':
+                proposer_aadhaar = fake.bothify(text='#### #### ####')
+                while not re.match(r'^\d{4}\s\d{4}\s\d{4}$', proposer_aadhaar):
+                    proposer_aadhaar = fake.bothify(text='#### #### ####')
+                kyc_details = [{'AADHAR': {'number': proposer_aadhaar, 'dob': fake.date_of_birth(minimum_age=18, maximum_age=70).strftime('%d/%m/%Y')}}]
+            else:
+                kyc_details = [{'CKYC': {'number': fake.bothify(text='##############'), 'dob': fake.date_of_birth(minimum_age=18, maximum_age=70).strftime('%d/%m/%Y')}}]
         else:
-            kyc_details = [{'CKYC': {'number': fake.bothify(text='##############'), 'dob': fake.date_of_birth(minimum_age=18, maximum_age=70).strftime('%d/%m/%Y')}}]
+            kyc_details = []
 
         # Financier details
         has_financier = random.choice([True, False])
@@ -176,16 +265,27 @@ def generate_test_case(scenario, testcase_id):
                 'proposer_pan': proposer_pan
             }
 
-        # IDV
-        idv_min = 50000
-        idv_max = 1500000
-        idv = random.randint(idv_min, idv_max) if scenario['journey_type'] == 'without_registration' else 0
+        # Individual details with consistent gender and title
+        individual_details = {}
+        if scenario['ownership'] == 'Individual':
+            gender = random.choice(['Male', 'Female'])
+            title = 'Mr' if gender == 'Male' else random.choice(['Ms', 'Mrs'])
+            individual_details = {
+                'proposer_first_name': customer_data['name'].split()[0],
+                'proposer_last_name': customer_data['name'].split()[-1] if len(customer_data['name'].split()) > 1 else '',
+                'proposer_dob': fake.date_of_birth(minimum_age=18, maximum_age=70).strftime('%d/%m/%Y'),
+                'proposer_gender': gender,
+                'proposer_title': title,
+                'proposer_aadhaar': proposer_aadhaar,
+                'proposer_marital_status': random.choice(['Married', 'Single']),
+                'proposer_pan': proposer_pan
+            }
 
-        return {
+        test_case = {
             'Testcase_id': f"{carrier.upper().replace(' ', '_')}_{scenario['category'].upper()}_{scenario['name']}_{testcase_id:03d}",
             'category': scenario['category'],
             'journey_type': scenario['journey_type'],
-            'registration_number': customer_data['registration_number'] if scenario['journey_type'] == 'without_registration' else '',
+            'registration_number': registration_number,
             'make_model': vehicle['make_model'],
             'variant': vehicle['variant'],
             'registration_date': registration_date,
@@ -215,7 +315,7 @@ def generate_test_case(scenario, testcase_id):
             'proposal_questions': json.dumps({
                 'vehicle_details': {
                     'manufacturing_year': str(manufacturing_year),
-                    'registration_number': customer_data['registration_number'] if scenario['journey_type'] == 'without_registration' else '',
+                    'registration_number': registration_number,
                     'engine_number': fake.bothify(text='##########'),
                     'chassis_number': fake.bothify(text='#################'),
                     'financier_name': financier_name,
@@ -229,16 +329,7 @@ def generate_test_case(scenario, testcase_id):
                     'proposer_email': customer_data['email'],
                     'proposer_phone_number': customer_data['phone_number']
                 },
-                'individual_details': {
-                    'proposer_first_name': customer_data['name'].split()[0],
-                    'proposer_last_name': customer_data['name'].split()[-1] if len(customer_data['name'].split()) > 1 else '',
-                    'proposer_dob': fake.date_of_birth(minimum_age=18, maximum_age=70).strftime('%d/%m/%Y'),
-                    'proposer_gender': random.choice(['Male', 'Female']),
-                    'proposer_title': random.choice(['Mr', 'Ms', 'Mrs']),
-                    'proposer_aadhaar': proposer_aadhaar,
-                    'proposer_marital_status': random.choice(['Married', 'Single']),
-                    'proposer_pan': proposer_pan
-                } if scenario['ownership'] == 'Individual' else {},
+                'individual_details': individual_details,
                 'company_details': company_details,
                 'customer_address': {
                     'address': customer_data['address'],
@@ -254,10 +345,14 @@ def generate_test_case(scenario, testcase_id):
             'risk_start_date': risk_start_date,
             'breakin_inspection_approval': 'Yes' if inspection_required == 'Yes' else 'No'
         }
-    except Exception:
+
+        return test_case
+
+    except Exception as e:
         return None
 
 def expand_scenarios():
+    """Generate additional scenarios by combining attributes and filtering invalid combinations."""
     categories = ['four_wheeler', 'two_wheeler']
     journey_types = ['new_journey', 'without_registration', 'rollover']
     policy_types = ['comprehensive', 'third_party', 'OD']
@@ -282,7 +377,7 @@ def expand_scenarios():
             continue
         if journey_type == 'rollover' and od_status == 'not_sure':
             continue
-        if manufacturing_year == '<2010' and 'VEHICLE_AGE_GT_15Y' not in scenarios:
+        if manufacturing_year == '<2010' and 'VEHICLE_AGE_GT_15Y' not in [s['name'] for s in scenarios]:
             continue
 
         additional_scenarios.append({
@@ -303,10 +398,12 @@ def expand_scenarios():
     return additional_scenarios
 
 def generate_test_case_wrapper(args):
+    """Wrapper for parallel processing of test case generation."""
     scenario, testcase_id = args
     return generate_test_case(scenario, testcase_id)
 
 def generate_test_cases_parallel(scenarios):
+    """Generate test cases in parallel using multiprocessing."""
     test_cases = []
     total_scenarios = len(scenarios)
     with Pool() as pool:
@@ -326,13 +423,16 @@ try:
     test_cases = generate_test_cases_parallel(all_scenarios)
 except KeyboardInterrupt:
     pd.DataFrame(test_cases).to_csv('automation_data_table_temp.csv', index=False)
-except Exception:
+except Exception as e:
+    print(f"Error during parallel processing: {str(e)}")
     pd.DataFrame(test_cases).to_csv('automation_data_table_temp.csv', index=False)
 
 # Save to Excel
 try:
     df = pd.DataFrame(test_cases)
-    df.to_excel('automation_data_table_generated.xlsx', index=False)
-    print(f"Excel file generated: automation_data_table_generated.xlsx with {len(test_cases)} test cases")
-except Exception:
+    output_file = 'automation_data_table_generated.xlsx'
+    df.to_excel(output_file, index=False)
+    print(f"Excel file generated: {output_file} with {len(test_cases)} test cases")
+except Exception as e:
+    print(f"Error saving Excel file: {str(e)}")
     sys.exit(1)

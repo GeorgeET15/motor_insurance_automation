@@ -1,7 +1,7 @@
 # Scenarios, carriers, and vehicles for motor insurance test cases
 
 scenarios = [
-    # New Business
+    # New Business (No Inspection Required)
     {
         'name': 'NB_INDIVIDUAL',
         'category': 'four_wheeler',
@@ -14,7 +14,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'PAN'
+        'kyc_type': 'PAN',
+        'inspection_required': 'No'
     },
     {
         'name': 'NB_COMPANY',
@@ -28,9 +29,10 @@ scenarios = [
         'policy_type': 'third_party',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'CKYC'
+        'kyc_type': 'CKYC',
+        'inspection_required': 'No'
     },
-    # Not Sure
+    # Not Sure (Inspection Depends on Ownership Change)
     {
         'name': 'NS_NO_TP',
         'category': 'four_wheeler',
@@ -43,7 +45,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '<2018-09',
         'kyc_verification': 'No',
-        'kyc_type': 'AADHAR'
+        'kyc_type': 'AADHAR',
+        'inspection_required': 'Yes'
     },
     {
         'name': 'NS_TP_3D',
@@ -57,7 +60,8 @@ scenarios = [
         'policy_type': 'third_party',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'PAN'
+        'kyc_type': 'PAN',
+        'inspection_required': 'No'
     },
     {
         'name': 'NS_TP_60D',
@@ -71,7 +75,8 @@ scenarios = [
         'policy_type': 'third_party',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'AADHAR'
+        'kyc_type': 'AADHAR',
+        'inspection_required': 'No'
     },
     {
         'name': 'NS_TP_90D',
@@ -85,7 +90,39 @@ scenarios = [
         'policy_type': 'third_party',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'No',
-        'kyc_type': 'CKYC'
+        'kyc_type': 'CKYC',
+        'inspection_required': 'Yes'
+    },
+    # New Not Sure Scenarios (Non-Expired, Active TP)
+    {
+        'name': 'NS_TP_TODAY_OWNERSHIP_CHANGED',
+        'category': 'four_wheeler',
+        'journey_type': 'without_registration',
+        'tp_status': 'today',
+        'od_status': 'not_sure',
+        'ownership': 'Company',
+        'ownership_changed': 'Yes',
+        'claim_taken': 'No',
+        'policy_type': 'third_party',
+        'manufacturing_year': '<2018-09',
+        'kyc_verification': 'Yes',
+        'kyc_type': 'PAN',
+        'inspection_required': 'Yes'
+    },
+    {
+        'name': 'NS_TP_90D_NO_OWNERSHIP_CHANGE',
+        'category': 'four_wheeler',
+        'journey_type': 'without_registration',
+        'tp_status': '>90D',
+        'od_status': 'not_sure',
+        'ownership': 'Individual',
+        'ownership_changed': 'No',
+        'claim_taken': 'No',
+        'policy_type': 'third_party',
+        'manufacturing_year': '>2018-09',
+        'kyc_verification': 'Yes',
+        'kyc_type': 'AADHAR',
+        'inspection_required': 'No'
     },
     # Rollover < 2018-09
     {
@@ -100,7 +137,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '<2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'PAN'
+        'kyc_type': 'PAN',
+        'inspection_required': 'No'
     },
     {
         'name': 'RO_PRE_2018_ACTIVE_EXP_90D',
@@ -114,7 +152,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '<2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'CKYC'
+        'kyc_type': 'CKYC',
+        'inspection_required': 'No'
     },
     {
         'name': 'RO_PRE_2018_EXPIRED_EXP_LT_90D',
@@ -128,7 +167,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '<2018-09',
         'kyc_verification': 'No',
-        'kyc_type': 'AADHAR'
+        'kyc_type': 'AADHAR',
+        'inspection_required': 'Yes'
     },
     {
         'name': 'RO_PRE_2018_EXPIRED_EXP_GT_90D',
@@ -142,7 +182,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '<2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'PAN'
+        'kyc_type': 'PAN',
+        'inspection_required': 'Yes'
     },
     # Rollover > 2018-09
     {
@@ -157,7 +198,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'PAN'
+        'kyc_type': 'PAN',
+        'inspection_required': 'No'
     },
     {
         'name': 'RO_POST_2018_OD_T_TP_60D',
@@ -171,7 +213,8 @@ scenarios = [
         'policy_type': 'OD',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'AADHAR'
+        'kyc_type': 'AADHAR',
+        'inspection_required': 'No'
     },
     {
         'name': 'RO_POST_2018_OD_T_TP_60D_90D',
@@ -185,7 +228,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'No',
-        'kyc_type': 'CKYC'
+        'kyc_type': 'CKYC',
+        'inspection_required': 'No'
     },
     {
         'name': 'RO_POST_2018_OD_T_TP_90D',
@@ -199,7 +243,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'PAN'
+        'kyc_type': 'PAN',
+        'inspection_required': 'No'
     },
     {
         'name': 'RO_POST_2018_OD_90D_TP_90D',
@@ -213,7 +258,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'AADHAR'
+        'kyc_type': 'AADHAR',
+        'inspection_required': 'No'
     },
     {
         'name': 'RO_POST_2018_EXPIRED_OD_90D_TP_T',
@@ -227,7 +273,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'PAN'
+        'kyc_type': 'PAN',
+        'inspection_required': 'Yes'
     },
     {
         'name': 'RO_POST_2018_EXPIRED_OD_90D_TP_60D',
@@ -241,7 +288,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'No',
-        'kyc_type': 'CKYC'
+        'kyc_type': 'CKYC',
+        'inspection_required': 'Yes'
     },
     {
         'name': 'RO_POST_2018_EXPIRED_OD_90D_TP_60D_90D',
@@ -255,7 +303,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'AADHAR'
+        'kyc_type': 'AADHAR',
+        'inspection_required': 'Yes'
     },
     {
         'name': 'RO_POST_2018_EXPIRED_OD_90D_TP_90D',
@@ -269,7 +318,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'PAN'
+        'kyc_type': 'PAN',
+        'inspection_required': 'Yes'
     },
     {
         'name': 'RO_POST_2018_EXPIRED_OD_GT_90D_TP_90D',
@@ -283,7 +333,99 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '>2018-09',
         'kyc_verification': 'Yes',
-        'kyc_type': 'CKYC'
+        'kyc_type': 'CKYC',
+        'inspection_required': 'No'
+    },
+    # New Rollover Scenarios (Non-Expired, Active Policies)
+    {
+        'name': 'RO_PRE_2018_ACTIVE_OD_T_TP_90D_OWNERSHIP_CHANGED',
+        'category': 'four_wheeler',
+        'journey_type': 'rollover',
+        'tp_status': '>90D',
+        'od_status': 'today',
+        'ownership': 'Individual',
+        'ownership_changed': 'Yes',
+        'claim_taken': 'No',
+        'policy_type': 'comprehensive',
+        'manufacturing_year': '<2018-09',
+        'kyc_verification': 'Yes',
+        'kyc_type': 'PAN',
+        'inspection_required': 'Yes'
+    },
+    {
+        'name': 'RO_PRE_2018_ACTIVE_OD_90D_TP_T',
+        'category': 'four_wheeler',
+        'journey_type': 'rollover',
+        'tp_status': 'today',
+        'od_status': '>90D',
+        'ownership': 'Company',
+        'ownership_changed': 'No',
+        'claim_taken': 'No',
+        'policy_type': 'OD',
+        'manufacturing_year': '<2018-09',
+        'kyc_verification': 'Yes',
+        'kyc_type': 'AADHAR',
+        'inspection_required': 'No'
+    },
+    {
+        'name': 'RO_POST_2018_ACTIVE_OD_T_TP_90D_OWNERSHIP_CHANGED',
+        'category': 'four_wheeler',
+        'journey_type': 'rollover',
+        'tp_status': '>90D',
+        'od_status': 'today',
+        'ownership': 'Individual',
+        'ownership_changed': 'Yes',
+        'claim_taken': 'No',
+        'policy_type': 'comprehensive',
+        'manufacturing_year': '>2018-09',
+        'kyc_verification': 'No',
+        'kyc_type': 'CKYC',
+        'inspection_required': 'Yes'
+    },
+    {
+        'name': 'RO_POST_2018_ACTIVE_OD_90D_TP_T',
+        'category': 'four_wheeler',
+        'journey_type': 'rollover',
+        'tp_status': 'today',
+        'od_status': '>90D',
+        'ownership': 'Company',
+        'ownership_changed': 'No',
+        'claim_taken': 'No',
+        'policy_type': 'comprehensive',
+        'manufacturing_year': '>2018-09',
+        'kyc_verification': 'Yes',
+        'kyc_type': 'PAN',
+        'inspection_required': 'No'
+    },
+    {
+        'name': 'RO_POST_2018_ACTIVE_THIRD_PARTY_OWNERSHIP_CHANGED',
+        'category': 'four_wheeler',
+        'journey_type': 'rollover',
+        'tp_status': 'today',
+        'od_status': 'not_sure',
+        'ownership': 'Individual',
+        'ownership_changed': 'Yes',
+        'claim_taken': 'No',
+        'policy_type': 'third_party',
+        'manufacturing_year': '>2018-09',
+        'kyc_verification': 'Yes',
+        'kyc_type': 'AADHAR',
+        'inspection_required': 'Yes'
+    },
+    {
+        'name': 'RO_POST_2018_ACTIVE_OD_90D_TP_90D_NO_CHANGE',
+        'category': 'four_wheeler',
+        'journey_type': 'rollover',
+        'tp_status': '>90D',
+        'od_status': '>90D',
+        'ownership': 'Company',
+        'ownership_changed': 'No',
+        'claim_taken': 'Yes',
+        'policy_type': 'comprehensive',
+        'manufacturing_year': '>2018-09',
+        'kyc_verification': 'Yes',
+        'kyc_type': 'CKYC',
+        'inspection_required': 'No'
     },
     # Edge Case
     {
@@ -298,7 +440,8 @@ scenarios = [
         'policy_type': 'comprehensive',
         'manufacturing_year': '<2010',
         'kyc_verification': 'Yes',
-        'kyc_type': 'PAN'
+        'kyc_type': 'PAN',
+        'inspection_required': 'No'
     }
 ]
 
@@ -413,3 +556,61 @@ vehicles = [
         'variant': 'Iron 883 (CC - 883 Seat Cap - 2 Fuel - Petrol)'
     }
 ]
+
+# City-State Mapping for India (simplified example, expand as needed)
+city_state_mapping = {
+    'Dibrugarh': 'Assam',
+    'Erode': 'Tamil Nadu',
+    'Guntakal': 'Andhra Pradesh',
+    'Amravati': 'Maharashtra',
+    'Shimla': 'Himachal Pradesh',
+    'Fatehpur': 'Uttar Pradesh',
+    'Mangalore': 'Karnataka',
+    'Kolhapur': 'Maharashtra',
+    'Nadiad': 'Gujarat',
+    'Ludhiana': 'Punjab',
+    'Jamalpur': 'Bihar',
+    'Malegaon': 'Maharashtra',
+    'Bidar': 'Karnataka',
+    'Mumbai': 'Maharashtra',
+    'Mau': 'Uttar Pradesh',
+    'Agartala': 'Tripura',
+    'Suryapet': 'Telangana',
+    'Mysore': 'Karnataka',
+    'Jhansi': 'Uttar Pradesh',
+    'North Dumdum': 'West Bengal',
+    'Srikakulam': 'Andhra Pradesh',
+    'Rohtak': 'Haryana',
+    'Rewa': 'Madhya Pradesh',
+    'Anantapuram': 'Andhra Pradesh',
+    'Baranagar': 'West Bengal',
+    'Tiruchirappalli': 'Tamil Nadu',
+    'Ghaziabad': 'Uttar Pradesh',
+    'Mehsana': 'Gujarat',
+    'Madhyamgram': 'West Bengal',
+    'Ratlam': 'Madhya Pradesh',
+    'Kharagpur': 'West Bengal'
+}
+
+# Base IDV ranges for vehicles
+base_idv_ranges = {
+    'MARUTI SUZUKI ALTO': (200000, 400000),
+    'HONDA CITY': (700000, 1200000),
+    'HYUNDAI CRETA': (1000000, 1800000),
+    'TATA NEXON': (800000, 1400000),
+    'MAHINDRA SCORPIO': (1200000, 2000000),
+    'FORD ECOSPORT': (700000, 1200000),
+    'TOYOTA FORTUNER': (2500000, 4000000),
+    'KIA Seltos': (900000, 1600000),
+    'BMW X5': (3000000, 6000000),
+    'HONDA ACTIVA': (50000, 100000),
+    'BAJAJ PULSAR': (70000, 120000),
+    'TVS JUPITER': (60000, 110000),
+    'ROYAL ENFIELD CLASSIC': (150000, 250000),
+    'YAMAHA FZ-S': (80000, 130000),
+    'SUZUKI ACCESS': (60000, 110000),
+    'KTM DUKE': (150000, 250000),
+    'HONDA CB SHINE': (60000, 110000),
+    'Bajaj Dominar': (150000, 250000),
+    'HARLEY DAVIDSON IRON 883': (800000, 1200000)
+}

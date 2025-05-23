@@ -1,2 +1,5 @@
 .env
-automation_data_table_updated.xlsx
+automation_data_table_generated.xlsx
+__pycache__
+automation_data_table_temp.csv
+.~lock.automation_data_table_generated.xlsx#

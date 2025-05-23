@@ -1,11 +1,11 @@
-import pandas as pd
-from faker import Faker
+import pandas as pd  # type: ignore
+from faker import Faker  # type: ignore
 from datetime import datetime, timedelta
 import random
 import json
 import itertools
 import re
-from tqdm import tqdm
+from tqdm import tqdm # type: ignore
 import sys
 from multiprocessing import Pool
 from functools import partial
@@ -13,6 +13,8 @@ from data.test_case_data import scenarios, carriers, vehicles, city_state_mappin
 
 # Initialize Faker
 fake = Faker('en_IN')
+
+test_cases = []
 
 def calculate_depreciation(vehicle_age):
     """Calculate depreciation percentage based on vehicle age."""
@@ -407,7 +409,7 @@ def generate_test_case_wrapper(args):
     return generate_test_case(scenario, testcase_id)
 
 def generate_test_cases_parallel(scenarios):
-    test_cases = []
+    
     total_scenarios = len(scenarios)
     with Pool() as pool:
         args = [(scenario, i) for i, scenario in enumerate(scenarios, 1)]
